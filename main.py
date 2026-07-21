@@ -17,7 +17,7 @@ async def health():
     return { "status": "ok" }
 
 @app.get("/tasks")
-async def get_tasks(id: int = None, title: str = None, done: bool = None):
+async def get_tasks(id: int = None, title: str = None, done: bool = None): # type: ignore
     for task in tasks:
         print(f"Task: {task}")
 
