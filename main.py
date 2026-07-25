@@ -13,8 +13,6 @@ def get_db():
     finally:
         conn.close()
 
-    return conn
-
 @app.get("/")
 def root():
     return { "name": "Task API", "version": "1.0", "endpoints": ["/tasks"] }
@@ -23,6 +21,7 @@ def root():
 def health():
     return { "status": "ok" }
 
+#1
 @app.get("/tasks")
 def get_tasks(conn: sqlite3.Connection = Depends(get_db)):
     cursor = conn.cursor()
@@ -42,16 +41,19 @@ def get_task(id: int, conn: sqlite3.Connection = Depends(get_db)):
 
     return {"id": task[0], "title": task[1], "done": bool(task[2])}
 
-
+#2
 @app.post("/tasks")
-def create_task(task: dict):
-    db.insert_task(task.get("title"), task.get("done", False))
+def create_task(task: dict, conn: sqlite3.Connection = Depends(get_db)):    
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO tasks (title, done) VALUES (?, ?)", (task.get("title"), task.get("done", False)))
+    conn.commit()
+
     if task.get("title") is None:
-        raise HTTPException(status_code=400, detail="Title is required")
-    return {201: "Created", "task": db.tasks}
+        raise HTTPException(status_code=400, detail="Missing title is required")
+    return {201: "Created", "task": {"id": cursor.lastrowid, "title": task.get("title"), "done": task.get("done", False)}}
 
 @app.put("/tasks/{id}")
-async def update_task(id: int, task: dict):
+def update_task(id: int, task: dict):
     if task is None or task == {}:
         raise HTTPException(status_code=400, detail="Empty body")
     
