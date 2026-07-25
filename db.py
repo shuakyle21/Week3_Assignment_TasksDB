@@ -1,7 +1,5 @@
 import sqlite3
 
-from main import tasks
-
 db_name = "tasks.db"
 
 def create_connection():
@@ -62,7 +60,7 @@ if __name__ == "__main__":
     try:
         create_table()
         if count_tasks() == 0:
-            for task in tasks:
+            for task in db_name:
                 insert_task(task["title"], task["done"])
         else:
             print("Tasks already exist in the database. Skipping insertion.")

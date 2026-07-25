@@ -1,12 +1,13 @@
+import sqlite3
+
 from fastapi import FastAPI, HTTPException
+import db
 
 app = FastAPI()
 
-tasks = [
-    { "id": 1, "title": "Clean room", "done": False },
-    { "id": 2, "title": "Buy groceries", "done": True },
-    { "id": 3, "title": "Walk the dog", "done": False }
-]   
+db_name = "tasks.db"
+conn = sqlite3.connect(db_name)
+cursor = conn.cursor()
 
 @app.get("/")
 async def root():
@@ -17,15 +18,14 @@ async def health():
     return { "status": "ok" }
 
 @app.get("/tasks")
-async def get_tasks(id: int = None, title: str = None, done: bool = None): # type: ignore
-    for task in tasks:
-        print(f"Task: {task}")
-
-    return tasks
+async def get_tasks():
+    cursor.execute("SELECT * FROM tasks")
+    tasks = cursor.fetchall()
+    return { task[0]: {"id": task[0], "title": task[1], "done": bool(task[2])} for task in tasks }
 
 @app.get("/tasks/{id}")
 def get_task(id: int):
-    for task in tasks:
+    for task in db.count_tasks():
         if task["id"] == id:
             return task
         
@@ -33,10 +33,10 @@ def get_task(id: int):
 
 @app.post("/tasks")
 def create_task(task: dict):
-    tasks.append({ "id": len(tasks) + 1, "title": task.get("title"), "done": task.get("done", False) })
+    db.insert_task(task.get("title"), task.get("done", False))
     if task.get("title") is None:
         raise HTTPException(status_code=400, detail="Title is required")
-    return {201: "Created", "task": tasks}
+    return {201: "Created", "task": db.tasks}
 
 @app.put("/tasks/{id}")
 async def update_task(id: int, task: dict):
