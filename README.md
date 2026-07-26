@@ -53,6 +53,83 @@ curl -i -X DELETE http://localhost:8000/tasks/1
 
 ![Screenshot](images/screenshot.png)
 
+## Exploring the database with SQL
+
+Everything below was run against `tasks.db` with the `sqlite3` command-line tool
+(version 3.51.0) after starting the server once on a fresh database, so the table
+holds only the three seeded tasks. The output is copied verbatim.
+
+**The schema SQLite actually stored**
+
+```
+$ sqlite3 tasks.db ".schema tasks"
+CREATE TABLE tasks (
+    id    INTEGER PRIMARY KEY,
+    title TEXT    NOT NULL CHECK (length(trim(title)) > 0),
+    done  INTEGER NOT NULL DEFAULT 0 CHECK (done IN (0, 1))
+);
+```
+
+**Read the whole table**
+
+```
+$ sqlite3 tasks.db -header -column "SELECT * FROM tasks;"
+id  title          done
+--  -------------  ----
+1   Clean room     0
+2   Buy groceries  1
+3   Walk the dog   0
+```
+
+`done` comes back as `0` / `1` because SQLite has no boolean type; the API turns
+it back into `true` / `false` on the way out.
+
+**Filter by `done`**
+
+```
+$ sqlite3 tasks.db -header -column "SELECT id, title FROM tasks WHERE done = 0;"
+id  title
+--  ------------
+1   Clean room
+3   Walk the dog
+```
+
+**Count how many tasks are in each state**
+
+```
+$ sqlite3 tasks.db -header -column "SELECT done, COUNT(*) AS total FROM tasks GROUP BY done;"
+done  total
+----  -----
+0     2
+1     1
+```
+
+**The CHECK constraints rejecting bad data**
+
+A title that is only whitespace is refused by the database itself, not just by
+the API:
+
+```
+$ sqlite3 tasks.db "INSERT INTO tasks (title, done) VALUES ('   ', 0);"
+Error: stepping, CHECK constraint failed: length(trim(title)) > 0 (19)
+```
+
+So is a `done` value that is not 0 or 1:
+
+```
+$ sqlite3 tasks.db "UPDATE tasks SET done = 2 WHERE id = 1;"
+Error: stepping, CHECK constraint failed: done IN (0, 1) (19)
+```
+
+Both statements failed, so nothing was written - the table is untouched:
+
+```
+$ sqlite3 tasks.db -header -column "SELECT COUNT(*) AS total FROM tasks;"
+total
+-----
+3
+```
+
 ## AI vs Me
 
 I gave an AI a prompt describing this same API from scratch, on a separate `ai-branch`, without letting it see my code. Comparing the two afterward:
