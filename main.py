@@ -3,6 +3,9 @@ import sqlite3
 
 import db
 
+# Build tasks.db before the app starts serving, so a fresh clone works with no
+# manual setup step.
+db.init_db()
 
 app = FastAPI()
 

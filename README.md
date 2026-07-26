@@ -1,18 +1,44 @@
-# Week 2 Assignment - Task CRUD API
+# Week 3 Assignment - Task CRUD API with SQLite
 
-A FastAPI-based REST API for managing a task list with full CRUD (Create, Read, Update, Delete) operations. This API allows users to create, retrieve, update, and delete tasks with support for filtering and status tracking.
+A FastAPI REST API for managing a task list with full CRUD (Create, Read, Update, Delete) operations. This week the tasks moved out of an in-memory Python list and into a real SQLite database, so they survive a server restart.
 
 ## How to run
 
-```bash
-# Install dependencies
-pip install fastapi uvicorn
+One command, from the repo root:
 
-# Start the server
-uvicorn main:app --reload
+```bash
+pip install -r requirements.txt && uvicorn main:app --reload
 ```
 
-The API will be available at `http://localhost:8000`
+That's the whole setup. The database doesn't exist in a fresh clone — `main.py` calls `db.init_db()` on startup, which creates `tasks.db`, creates the `tasks` table, and seeds three starter tasks if the table is empty. Nothing to run by hand first.
+
+The API will be available at `http://localhost:8000`.
+
+Run it from the repo root — `db_name` in [db.py](db.py) is the relative path `tasks.db`, so starting the server from somewhere else puts the database somewhere else.
+
+## Why SQLite
+
+- **It's a single file.** The whole database is `tasks.db` sitting next to the code. I can copy it, delete it to start over, or open it in a GUI without any of that touching a server process.
+- **Zero setup.** `sqlite3` ships with Python, so there's no database server to install, no port to configure, no user and password to create. The `pip install` line above is genuinely all a stranger needs.
+- **It survives restarts.** This was the actual point of the week. In Week 2 my tasks lived in a Python list, so every `--reload` wiped them. Now a task I create with `POST /tasks` is still there after I stop and start the server.
+
+## Where the database file lives
+
+`tasks.db`, in the repo root, right next to [main.py](main.py).
+
+It's created automatically on first startup and it's listed in [.gitignore](.gitignore), so it is **not** committed to the repo. That's deliberate: my database has whatever junk tasks I made while testing, and there's no reason to push that to anyone else. Every clone starts fresh and generates its own copy with the same three seeded tasks.
+
+## Database schema
+
+```sql
+CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    done BOOLEAN NOT NULL CHECK (done IN (0, 1))
+)
+```
+
+SQLite has no real boolean type, so `done` is stored as `0` or `1`. The `CHECK` constraint stops anything else getting in, and the API converts it back with `bool()` on the way out.
 
 ## Endpoints
 
@@ -49,11 +75,34 @@ curl -i -X PUT http://localhost:8000/tasks/1 \
 curl -i -X DELETE http://localhost:8000/tasks/1
 ```
 
+## Stage 4: exploring the database in DB Browser
+
+![Database open in DB Browser for SQLite](images/db_browser.png)
+
+One of the queries I ran in the Execute SQL tab, to see the split between finished and unfinished tasks:
+
+```sql
+SELECT done, COUNT(*) AS how_many
+FROM tasks
+GROUP BY done;
+```
+
+On a freshly seeded database that gives:
+
+| done | how_many |
+|------|----------|
+| 0    | 1        |
+| 1    | 2        |
+
+Two done, one not. What I got out of this stage is that the database is readable without going through my API at all — the same rows my `GET /tasks` endpoint returns are just sitting there in a file I can open and query directly. Useful when I want to check whether a bug is in my SQL or in my FastAPI code.
+
 ## Swagger UI
 
 ![Screenshot](images/screenshot.png)
 
-## AI vs Me
+## AI vs Me (Week 2 reflection)
+
+Kept from Week 2, so it describes the in-memory list version of the app, before the SQLite rewrite.
 
 I gave an AI a prompt describing this same API from scratch, on a separate `ai-branch`, without letting it see my code. Comparing the two afterward:
 

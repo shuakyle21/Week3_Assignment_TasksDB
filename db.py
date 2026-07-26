@@ -2,6 +2,12 @@ import sqlite3
 
 db_name = "tasks.db"
 
+SEED_TASKS = [
+    {"title": "Read the FastAPI docs", "done": True},
+    {"title": "Wire up SQLite", "done": True},
+    {"title": "Write the Week 3 README", "done": False},
+]
+
 def create_connection():
     conn = None
     try:
@@ -55,15 +61,17 @@ def insert_task(title, done):
         finally:
             conn.close()
 
+def init_db():
+    create_table()
+    if count_tasks() == 0:
+        for task in SEED_TASKS:
+            insert_task(task["title"], task["done"])
+
 if __name__ == "__main__":
 
     try:
-        create_table()
-        if count_tasks() == 0:
-            for task in db_name:
-                insert_task(task["title"], task["done"])
-        else:
-            print("Tasks already exist in the database. Skipping insertion.")
+        init_db()
+        print(f"{db_name} ready with {count_tasks()} tasks.")
 
     except Exception as e:
         print(f"Error: {e}")
