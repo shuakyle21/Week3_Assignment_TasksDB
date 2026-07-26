@@ -7,11 +7,17 @@ slow query cannot stall the event loop.
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, status
-from pydantic import BaseModel, ConfigDict
+from fastapi import FastAPI, HTTPException, Response, status
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 import db
+
+# Whitespace is stripped before the length check, so "   " is a clean 422 from
+# the model rather than a 500 out of the database CHECK constraint, and the
+# value that reaches SQL is the stripped one.
+TaskTitle = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class StrictModel(BaseModel):
@@ -30,6 +36,13 @@ class Task(StrictModel):
     id: int
     title: str
     done: bool
+
+
+class TaskCreate(StrictModel):
+    """Request body of `POST /tasks`. `done` defaults to False when omitted."""
+
+    title: TaskTitle
+    done: bool = False
 
 
 class ApiInfo(StrictModel):
@@ -82,17 +95,18 @@ def get_task(id: int) -> db.TaskRecord:
     return task
 
 
-# The three write endpoints are migrated to SQLite in Stages 2 and 3. Until
-# then they answer honestly with 501 instead of mutating state that no longer
-# exists - the in-memory list they used to write to is gone.
-@app.post("/tasks", response_model=None, status_code=status.HTTP_501_NOT_IMPLEMENTED)
-def create_task() -> None:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Create is not wired to the database yet",
-    )
+@app.post("/tasks", response_model=Task, status_code=status.HTTP_201_CREATED)
+def create_task(payload: TaskCreate, response: Response) -> db.TaskRecord:
+    # `payload` is already validated: a malformed body is rejected by the model
+    # before this function runs, so nothing invalid ever reaches SQL.
+    task = db.insert_task(payload.title, payload.done)
+    response.headers["Location"] = f"/tasks/{task['id']}"
+    return task
 
 
+# Update and delete are migrated to SQLite in Stage 3. Until then they answer
+# honestly with 501 instead of mutating state that no longer exists - the
+# in-memory list they used to write to is gone.
 @app.put("/tasks/{id}", response_model=None, status_code=status.HTTP_501_NOT_IMPLEMENTED)
 def update_task(id: int) -> None:
     raise HTTPException(

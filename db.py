@@ -97,3 +97,17 @@ def get_task(task_id: int) -> TaskRecord | None:
             (task_id,),
         ).fetchone()
     return _to_task(row) if row is not None else None
+
+
+def insert_task(title: str, done: bool) -> TaskRecord:
+    """Insert a task and return it as stored, with the id SQLite assigned."""
+    with connection() as conn:
+        cursor = conn.execute(
+            "INSERT INTO tasks (title, done) VALUES (?, ?)",
+            (title, done),
+        )
+        row = conn.execute(
+            "SELECT id, title, done FROM tasks WHERE id = ?",
+            (cursor.lastrowid,),
+        ).fetchone()
+    return _to_task(row)
