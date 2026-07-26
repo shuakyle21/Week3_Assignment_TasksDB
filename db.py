@@ -111,3 +111,30 @@ def insert_task(title: str, done: bool) -> TaskRecord:
             (cursor.lastrowid,),
         ).fetchone()
     return _to_task(row)
+
+
+def replace_task(task_id: int, title: str, done: bool) -> TaskRecord | None:
+    """Overwrite both columns of one task.
+
+    Returns the stored task, or None when no row carried that id so the caller
+    can answer 404 instead of pretending the write happened.
+    """
+    with connection() as conn:
+        cursor = conn.execute(
+            "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
+            (title, done, task_id),
+        )
+        if cursor.rowcount == 0:
+            return None
+        row = conn.execute(
+            "SELECT id, title, done FROM tasks WHERE id = ?",
+            (task_id,),
+        ).fetchone()
+    return _to_task(row)
+
+
+def delete_task(task_id: int) -> bool:
+    """Delete one task, returning True only when a row actually matched."""
+    with connection() as conn:
+        cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+        return cursor.rowcount > 0

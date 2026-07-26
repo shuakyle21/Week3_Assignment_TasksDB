@@ -45,6 +45,17 @@ class TaskCreate(StrictModel):
     done: bool = False
 
 
+class TaskReplace(StrictModel):
+    """Request body of `PUT /tasks/{id}`.
+
+    PUT is a full replacement, so both fields are required. Omitting one is a
+    422 rather than a silent overwrite with a default.
+    """
+
+    title: TaskTitle
+    done: bool
+
+
 class ApiInfo(StrictModel):
     """Response body of `GET /`."""
 
@@ -104,20 +115,29 @@ def create_task(payload: TaskCreate, response: Response) -> db.TaskRecord:
     return task
 
 
-# Update and delete are migrated to SQLite in Stage 3. Until then they answer
-# honestly with 501 instead of mutating state that no longer exists - the
-# in-memory list they used to write to is gone.
-@app.put("/tasks/{id}", response_model=None, status_code=status.HTTP_501_NOT_IMPLEMENTED)
-def update_task(id: int) -> None:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Update is not wired to the database yet",
-    )
+@app.put("/tasks/{id}", response_model=Task, status_code=status.HTTP_200_OK)
+def update_task(id: int, payload: TaskReplace) -> db.TaskRecord:
+    task = db.replace_task(id, payload.title, payload.done)
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task {id} not found",
+        )
+    return task
 
 
-@app.delete("/tasks/{id}", response_model=None, status_code=status.HTTP_501_NOT_IMPLEMENTED)
-def delete_task(id: int) -> None:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Delete is not wired to the database yet",
-    )
+@app.delete(
+    "/tasks/{id}",
+    response_model=None,
+    response_class=Response,
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_task(id: int) -> Response:
+    if not db.delete_task(id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task {id} not found",
+        )
+    # 204 means "no content": an explicit empty Response keeps a JSON `null`
+    # out of the body.
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
