@@ -80,3 +80,20 @@ def initialise() -> None:
                 "INSERT INTO tasks (title, done) VALUES (?, ?)",
                 SEED_TASKS,
             )
+
+
+def list_tasks() -> list[TaskRecord]:
+    """Return every task, oldest id first."""
+    with connection() as conn:
+        rows = conn.execute("SELECT id, title, done FROM tasks ORDER BY id").fetchall()
+    return [_to_task(row) for row in rows]
+
+
+def get_task(task_id: int) -> TaskRecord | None:
+    """Return one task, or None when no row has that id."""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id, title, done FROM tasks WHERE id = ?",
+            (task_id,),
+        ).fetchone()
+    return _to_task(row) if row is not None else None
