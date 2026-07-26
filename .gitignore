@@ -1,0 +1,14 @@
+# SQLite database - built automatically on first run, so every clone starts fresh
+tasks.db
+*.db-journal
+
+# Virtual environments
+.venv/
+venv/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local environment variables
+.env
