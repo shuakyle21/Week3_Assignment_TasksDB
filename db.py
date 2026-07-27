@@ -9,15 +9,7 @@ from dotenv import load_dotenv
 # and load_dotenv() does not override variables that are already set.
 load_dotenv()
 
-# Connection settings all come from the environment (see .env / .env.example).
-# Inside docker compose, POSTGRES_HOST is the service name of the database
-# container ("db"); for a local run outside Docker the defaults point at
-# localhost, where the published container port is reachable.
-DB_HOST = os.environ.get("POSTGRES_HOST", "localhost")
-DB_PORT = os.environ.get("POSTGRES_PORT", "5432")
-DB_NAME = os.environ.get("POSTGRES_DB", "tasks")
-DB_USER = os.environ.get("POSTGRES_USER", "taskuser")
-DB_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 SEED_TASKS = [
     {"title": "Read the FastAPI docs", "done": True},
@@ -26,13 +18,7 @@ SEED_TASKS = [
 ]
 
 def create_connection():
-    return psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-    )
+    return psycopg2.connect(DATABASE_URL)
 
 def wait_for_db(retries=10, delay=2):
     # The db container may accept connections a moment after it starts, so retry

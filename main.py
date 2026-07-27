@@ -1,5 +1,5 @@
 from fastapi import Depends, FastAPI, HTTPException
-
+import psycopg2
 import db
 
 # Create the tasks table and seed it before the app starts serving, so a fresh
