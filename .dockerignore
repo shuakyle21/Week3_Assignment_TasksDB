@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.env
+tasks.db
+*.db-journal
+*.sqbpro
+images/
+.DS_Store
+README.md
+.github/
+.fallow/

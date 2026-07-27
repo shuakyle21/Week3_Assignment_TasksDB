@@ -1,44 +1,52 @@
-# Week 3 Assignment - Task CRUD API with SQLite
+# Week 3 Assignment - Task CRUD API with PostgreSQL + Docker
 
-A FastAPI REST API for managing a task list with full CRUD (Create, Read, Update, Delete) operations. This week the tasks moved out of an in-memory Python list and into a real SQLite database, so they survive a server restart.
+A FastAPI REST API for managing a task list with full CRUD (Create, Read, Update, Delete) operations. The tasks have moved through three storage backends over the course of this assignment: an in-memory Python list (Week 2), a SQLite file (Stages 1-5 below), and now PostgreSQL running as its own server in a Docker container. The app and the database each run in their own container, and `docker compose up` starts both.
 
 ## How to run
 
-One command, from the repo root:
+One-time setup — copy the example environment file and (optionally) change the password:
 
 ```bash
-pip install -r requirements.txt && uvicorn main:app --reload
+cp .env.example .env
 ```
 
-That's the whole setup. The database doesn't exist in a fresh clone — `main.py` calls `db.init_db()` on startup, which creates `tasks.db`, creates the `tasks` table, and seeds three starter tasks if the table is empty. Nothing to run by hand first.
+Then, from the repo root:
 
-The API will be available at `http://localhost:8000`.
+```bash
+docker compose up
+```
 
-Run it from the repo root — `db_name` in [db.py](db.py) is the relative path `tasks.db`, so starting the server from somewhere else puts the database somewhere else.
+That's it. Compose builds the `web` image from the [Dockerfile](Dockerfile), starts a `postgres:16` container, waits for Postgres to report healthy, then starts the API. `main.py` calls `db.init_db()` on startup, which retries the connection until the database is reachable, creates the `tasks` table, and seeds three starter tasks if the table is empty.
 
-## Why SQLite
+The API is available at `http://localhost:8000`, and the database itself is published on `localhost:5432` if you want to connect to it directly (e.g. with `psql` or a GUI) using the credentials in `.env`.
 
-- **It's a single file.** The whole database is `tasks.db` sitting next to the code. I can copy it, delete it to start over, or open it in a GUI without any of that touching a server process.
-- **Zero setup.** `sqlite3` ships with Python, so there's no database server to install, no port to configure, no user and password to create. The `pip install` line above is genuinely all a stranger needs.
-- **It survives restarts.** This was the actual point of the week. In Week 2 my tasks lived in a Python list, so every `--reload` wiped them. Now a task I create with `POST /tasks` is still there after I stop and start the server.
+Stop everything with `docker compose down`. Task data lives in a named Docker volume (`pgdata`), so it survives a `down`/`up` cycle — add `-v` to `docker compose down` if you want to wipe it and start fresh.
 
-## Where the database file lives
+## Why a `.env` file
 
-`tasks.db`, in the repo root, right next to [main.py](main.py).
+The database password is never hardcoded or committed. [.env](.env) holds it locally and is listed in [.gitignore](.gitignore); [.env.example](.env.example) is the committed template with safe throwaway defaults, so a fresh clone works immediately after the one-time `cp` step above without anyone having to invent their own values.
 
-It's created automatically on first startup and it's listed in [.gitignore](.gitignore), so it is **not** committed to the repo. That's deliberate: my database has whatever junk tasks I made while testing, and there's no reason to push that to anyone else. Every clone starts fresh and generates its own copy with the same three seeded tasks.
+## Why PostgreSQL and Docker
+
+- **A real database server, not a file.** SQLite worked, but it's a single file one process writes to. Postgres runs as its own long-lived server process that the API connects to over the network (`db.py` uses `psycopg2` and talks to the `db` host on port 5432) — the same model as most production backends, FlyRank included.
+- **Docker kills "works on my machine."** Instead of installing Postgres and matching versions by hand, `docker-compose.yml` pulls a pinned `postgres:16` image and runs it as a disposable container that behaves identically on any machine with Docker installed.
+- **One command starts the whole stack.** `docker compose up` builds the app image, starts the database, waits for its healthcheck, then starts the app — no separate steps, no manual `db.init_db()` call before the server can run.
+
+## Where the data lives
+
+Postgres stores its data files inside the container, in the named volume `pgdata` (declared in [docker-compose.yml](docker-compose.yml)). Unlike the SQLite file, there's nothing to see in the repo directory — the data survives container restarts because the volume is separate from the container's filesystem, but it's gone if you explicitly remove the volume (`docker compose down -v`).
 
 ## Database schema
 
 ```sql
 CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,
-    done BOOLEAN NOT NULL CHECK (done IN (0, 1))
+    done BOOLEAN NOT NULL
 )
 ```
 
-SQLite has no real boolean type, so `done` is stored as `0` or `1`. The `CHECK` constraint stops anything else getting in, and the API converts it back with `bool()` on the way out.
+Postgres has a native `BOOLEAN` type, so unlike SQLite there's no need for a `CHECK (done IN (0, 1))` workaround — the column simply can't hold anything else. `SERIAL` replaces `INTEGER PRIMARY KEY AUTOINCREMENT` as Postgres's auto-incrementing id.
 
 ## Endpoints
 
@@ -76,6 +84,8 @@ curl -i -X DELETE http://localhost:8000/tasks/1
 ```
 
 ## Stage 4: exploring the database in DB Browser
+
+Kept from the SQLite stage of this assignment, before the move to PostgreSQL — the point about being able to inspect the database directly still holds, it's just `psql`/a Postgres GUI now instead of DB Browser for SQLite.
 
 ![Database open in DB Browser for SQLite](images/db_browser.png)
 
