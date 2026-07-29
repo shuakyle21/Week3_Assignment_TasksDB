@@ -40,7 +40,7 @@ def get_task(id: int, conn = Depends(get_db)):
     task = cursor.fetchone()
 
     if task is None:
-        raise HTTPException(status_code=404, detail=f"Task {id} not found, error code: {404}")
+        raise HTTPException(status_code=404, detail={"error": "Task not found"})
 
     return {"id": task[0], "title": task[1], "done": bool(task[2])}
 
