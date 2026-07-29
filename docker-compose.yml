@@ -5,27 +5,22 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      # Named volume keeps the data across `docker compose down`/`up`.
       - pgdata:/var/lib/postgresql/data
     ports:
-      # Published so you can also reach the database from the host (psql, a GUI).
       - "5432:5432"
     healthcheck:
-      # $$ escapes so the variable is expanded inside the container, not by compose.
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  web:
+  api:
     build: .
     restart: unless-stopped
     environment:
-      # "db" is the database service's name on the compose network.
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     depends_on:
       db:
-        # Wait until Postgres is actually accepting connections before starting.
         condition: service_healthy
     ports:
       - "8000:8000"
