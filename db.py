@@ -48,6 +48,7 @@ def create_table():
                     done BOOLEAN NOT NULL
                 )
             ''')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_done ON tasks (done)')
         conn.commit()
     finally:
         conn.close()

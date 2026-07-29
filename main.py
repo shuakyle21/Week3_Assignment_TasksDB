@@ -21,8 +21,14 @@ def root():
     return { "name": "Task API", "version": "1.0", "endpoints": ["/tasks"] }
 
 @app.get("/health")
-def health():
-    return { "status": "ok" }
+def health(conn = Depends(get_db)):
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        return {"status": "ok", "db": "ok"}
+    except psycopg2.OperationalError:
+        raise HTTPException(status_code=503, detail={"status": "error", "db": "unreachable"})
 
 #1
 @app.get("/tasks")
